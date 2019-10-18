@@ -4,26 +4,27 @@
 #include <vector>
 #include <string>
 #include <ncurses.h>
-#include "EventQueue.hpp"
+#include "Events.hpp"
+#include "HackChatEvents.hpp"
 
 class BacklogMessage;
 
 class NCurses
 {
 public:
-    NCurses(EventQueue& queue, EventQueue& hackChatQueue);
+    NCurses(EventQueue& queue, HackEventQueue& hackChatQueue);
     ~NCurses();
 
-    void onInput(class EventInput&);
-    void onUserList(class EventUserList&);
-    void onUserChanged(class EventUserChanged&);
-    void onMessage(class EventMessage&);
+    void onInput(const EventInput&);
+    void onUserList(const EventUserList&);
+    void onUserChanged(const EventUserChanged&);
+    void onMessage(const EventMessage&);
 
 private:
     void addMessage(const EventMessage& message);
 
     EventQueue& queue;
-    EventQueue& hackChatQueue;
+    HackEventQueue& hackChatQueue;
     bool redraw;
     bool redrawusers;
     std::mutex usersMutex;

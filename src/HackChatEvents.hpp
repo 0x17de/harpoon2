@@ -2,19 +2,19 @@
 #include "Queue.hpp"
 #include <boost/date_time.hpp>
 #include "EventBase.hpp"
-#include "HackChatClient.hpp"
 #include "enums/MessageType.hpp"
 #include "enums/UserChangeType.hpp"
+#include "Queue.hpp"
 
 
-EVENT_CLASS(hackchat::Client, HackSendMessage)
+class EventHackSendMessage
 {
 public:
     inline EventHackSendMessage(const std::string& message) : message(message) { }
 
     std::string message;
 };
-EVENT_CLASS(hackchat::Client, HackConnect)
+class EventHackConnect
 {
 public:
     inline EventHackConnect() { }
@@ -34,12 +34,22 @@ public:
     std::string username;
     std::string password;
 };
-EVENT_CLASS(hackchat::Client, HackDisconnect)
+class EventHackDisconnect
 {
 };
-EVENT_CLASS(hackchat::Client, HackConnected)
+class EventHackConnected
 {
 };
-EVENT_CLASS(hackchat::Client, HackDisconnected)
+class EventHackDisconnected
 {
 };
+
+using HackEvent = std::variant<
+    EventHackSendMessage,
+    EventHackConnect,
+    EventHackDisconnect,
+    EventHackConnected,
+    EventHackDisconnected
+    >;
+
+using HackEventQueue = Queue<HackEvent>;

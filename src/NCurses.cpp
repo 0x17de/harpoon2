@@ -25,6 +25,11 @@
 #define PAIR_STATUS 5
 #define PAIR_MENTION 6
 
+MAP_EVENT(NCurses, Input);
+MAP_EVENT(NCurses, UserList);
+MAP_EVENT(NCurses, UserChanged);
+MAP_EVENT(NCurses, Message);
+
 class BacklogMessage
 {
 public:
@@ -153,7 +158,7 @@ void BacklogMessage::computeMessageWithBreaks(size_t maxMessageWidth)
     calculatedMessageWidth = maxMessageWidth;
 }
 
-NCurses::NCurses(EventQueue& queue, EventQueue& hackChatQueue)
+NCurses::NCurses(EventQueue& queue, HackEventQueue& hackChatQueue)
     : queue(queue)
     , hackChatQueue(hackChatQueue)
 {
@@ -166,7 +171,7 @@ NCurses::NCurses(EventQueue& queue, EventQueue& hackChatQueue)
             while (RUNNING)
             {
                 if (const auto& optMessage = this->queue.pop())
-                    (*optMessage)->handle(this);
+                    handleEvent(*this, *optMessage);
             }
         });
     t = NJThread(
@@ -448,7 +453,7 @@ NCurses::NCurses(EventQueue& queue, EventQueue& hackChatQueue)
                     }
                     else if (k == '\r' || k == '\n')
                     {
-                        this->queue.push(std::make_shared<EventInput>(buffer));
+                        this->queue.push(EventInput(buffer));
                         buffer = "";
                         redrawinput = true;
                     }
@@ -465,18 +470,18 @@ NCurses::~NCurses()
     endwin();
 }
 
-void NCurses::onInput(EventInput& event)
+void NCurses::onInput(const EventInput& event)
 {
-    hackChatQueue.push(std::make_shared<EventHackSendMessage>(event.message));
+    hackChatQueue.push(EventHackSendMessage(event.message));
 }
 
-void NCurses::onUserList(EventUserList& event)
+void NCurses::onUserList(const EventUserList& event)
 {
     std::lock_guard lock(usersMutex);
     users = event.users;
     redrawusers = true;
 }
-void NCurses::onUserChanged(EventUserChanged& event)
+void NCurses::onUserChanged(const EventUserChanged& event)
 {
     std::lock_guard lock(usersMutex);
     switch (event.changeType)
@@ -492,7 +497,7 @@ void NCurses::onUserChanged(EventUserChanged& event)
     }
     redrawusers = true;
 }
-void NCurses::onMessage(EventMessage& event)
+void NCurses::onMessage(const EventMessage& event)
 {
     addMessage(event);
 }

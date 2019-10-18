@@ -1,13 +1,14 @@
 #pragma once
 #include "Queue.hpp"
 #include <boost/date_time.hpp>
+#include <variant>
 #include "EventBase.hpp"
-#include "NCurses.hpp"
 #include "enums/MessageType.hpp"
 #include "enums/UserChangeType.hpp"
+#include "Queue.hpp"
 
 
-EVENT_CLASS(NCurses, Input)
+class EventInput
 {
 public:
     inline EventInput(const std::string& message) : message(message) {}
@@ -15,7 +16,7 @@ public:
 
     std::string message;
 };
-EVENT_CLASS(NCurses, UserList)
+class EventUserList
 {
 public:
     inline EventUserList(std::vector<std::string>&& users)
@@ -29,7 +30,7 @@ public:
 
     std::vector<std::string> users;
 };
-EVENT_CLASS(NCurses, UserChanged)
+class EventUserChanged
 {
 public:
     inline EventUserChanged(std::string&& user, UserChangeType changeType)
@@ -46,7 +47,7 @@ public:
     std::string user;
     UserChangeType changeType;
 };
-EVENT_CLASS(NCurses, Message)
+class EventMessage
 {
 public:
     inline EventMessage(const std::string& sender,
@@ -66,3 +67,11 @@ public:
     std::map<std::string, std::string> extra;
 };
 
+using Event = std::variant<
+    EventInput,
+    EventUserList,
+    EventUserChanged,
+    EventMessage
+    >;
+
+using EventQueue = Queue<Event>;

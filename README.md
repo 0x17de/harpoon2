@@ -14,5 +14,5 @@ make -j4
 
 From the project root call the binary:
 ```
-./bin/harpoon3 --username myuser --password mypassword --channel harpoon
+./bin/harpoon2 --username myuser --password mypassword --channel harpoon
 ```

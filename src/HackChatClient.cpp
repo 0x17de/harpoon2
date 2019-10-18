@@ -3,6 +3,12 @@
 #include "HackChatEvents.hpp"
 #include "Events.hpp"
 
+MAP_EVENT(hackchat::Client, HackSendMessage);
+MAP_EVENT(hackchat::Client, HackConnect);
+MAP_EVENT(hackchat::Client, HackConnected);
+MAP_EVENT(hackchat::Client, HackDisconnect);
+MAP_EVENT(hackchat::Client, HackDisconnected);
+
 namespace hackchat
 {
 
@@ -36,7 +42,7 @@ Client::Client(EventQueue& harpoon)
             while (RUNNING)
             {
                 if (const auto& optMessage = this->queue.pop())
-                    (*optMessage)->handle(this);
+                    handleEvent(*this, *optMessage);
             }
         });
 }
@@ -49,7 +55,7 @@ Client::~Client()
     wssPingCondition.notify_all();
 }
 
-void Client::onHackSendMessage(EventHackSendMessage& event)
+void Client::onHackSendMessage(const EventHackSendMessage& event)
 {
     Json::Value root;
     root["cmd"] = "chat";
@@ -62,18 +68,17 @@ void Client::onHackSendMessage(EventHackSendMessage& event)
         websocketpp::frame::opcode::text,
         ec);
 }
-void Client::onHackConnect(EventHackConnect& event)
+void Client::onHackConnect(const EventHackConnect& event)
 {
     server = event.server;
     channel = event.channel;
     username = event.username;
     password = event.password;
 
-    harpoon.push(
-        std::make_shared<EventMessage>(
-            "system",
-            "connecting to hack.chat " + server,
-            MessageType::Status));
+    harpoon.push(EventMessage(
+        "system",
+        "connecting to hack.chat " + server,
+        MessageType::Status));
     connected = true;
     wss.set_tls_init_handler(
         [](auto hdl)
@@ -108,23 +113,21 @@ void Client::onHackConnect(EventHackConnect& event)
                     std::string text = root.get("text", "").asString();
                     text.erase(std::remove(text.begin(), text.end(), '\0'), text.end()); // remove nullbytes
 
-                    auto event = std::make_shared<EventMessage>(
-                        root.get("nick", "system").asString(),
-                        text);
-                    parseTime(event->time, root["time"]);
+                    auto event = EventMessage(root.get("nick", "system").asString(),
+                                              text);
+                    parseTime(event.time, root["time"]);
 
-                    event->extra["trip"] = root.get("trip", "").asString();
-                    event->extra["mod"] = root.get("mod", false).asBool() ? "1" : "";
+                    event.extra["trip"] = root.get("trip", "").asString();
+                    event.extra["mod"] = root.get("mod", false).asBool() ? "1" : "";
 
                     harpoon.push(std::move(event));
                 }
                 else if (cmd == "warn")
                 {
-                    auto event = std::make_shared<EventMessage>(
-                        "system",
-                        root.get("text", "").asString(),
-                        MessageType::Status);
-                    parseTime(event->time, root["time"]);
+                    auto event = EventMessage("system",
+                                              root.get("text", "").asString(),
+                                              MessageType::Status);
+                    parseTime(event.time, root["time"]);
                     harpoon.push(std::move(event));
                 }
                 else if (cmd == "info")
@@ -135,42 +138,36 @@ void Client::onHackConnect(EventHackConnect& event)
                         const std::string& nick = root.get("from", "").asString();
                         const std::string& trip = root.get("trip", "").asString();
                         const std::string& utype = root.get("utype", "").asString();
-                        auto event = std::make_shared<EventMessage>(
-                            nick,
-                            root.get("text", "").asString(),
-                            MessageType::Whisper);
-                        if (!trip.empty()) event->extra["trip"] = trip;
-                        if (utype == "mod") event->extra["mod"] = "1";
+                        auto event = EventMessage(nick,
+                                                  root.get("text", "").asString(),
+                                                  MessageType::Whisper);
+                        if (!trip.empty()) event.extra["trip"] = trip;
+                        if (utype == "mod") event.extra["mod"] = "1";
                         harpoon.push(std::move(event));
                     }
                     else if (type == "emote")
                     {
                         const std::string& nick = root.get("nick", "").asString();
-                        harpoon.push(
-                            std::make_shared<EventMessage>(nick,
-                                                           root.get("text", "").asString(),
-                                                           MessageType::Me));
+                        harpoon.push(EventMessage(nick,
+                                                  root.get("text", "").asString(),
+                                                  MessageType::Me));
                     }
                 }
                 else if (cmd == "onlineAdd")
                 {
                     const std::string& nick = root.get("nick", "").asString();
-                    harpoon.push(
-                        std::make_shared<EventUserChanged>(nick, UserChangeType::Add));
-                    harpoon.push(
-                        std::make_shared<EventMessage>("system",
-                                                       nick + " has joined the channel",
-                                                       MessageType::Status));
+                    harpoon.push(EventUserChanged(nick, UserChangeType::Add));
+                    harpoon.push(EventMessage("system",
+                                              nick + " has joined the channel",
+                                              MessageType::Status));
                 }
                 else if (cmd == "onlineRemove")
                 {
                     const std::string& nick = root.get("nick", "").asString();
-                    harpoon.push(
-                        std::make_shared<EventMessage>("system",
-                                                       nick + " has left the channel",
-                                                       MessageType::Status));
-                    harpoon.push(
-                        std::make_shared<EventUserChanged>(nick, UserChangeType::Remove));
+                    harpoon.push(EventMessage("system",
+                                              nick + " has left the channel",
+                                              MessageType::Status));
+                    harpoon.push(EventUserChanged(nick, UserChangeType::Remove));
                 }
                 else if (cmd == "onlineSet")
                 {
@@ -180,23 +177,22 @@ void Client::onHackConnect(EventHackConnect& event)
                         std::vector<std::string> nicks(nicksArrayValue.size());
                         for (int i = 0; i < static_cast<int>(nicksArrayValue.size()); ++i)
                             nicks[i] = nicksArrayValue[i].asString();
-                        harpoon.push(std::make_shared<EventUserList>(std::move(nicks)));
+                        harpoon.push(EventUserList(std::move(nicks)));
                     }
                 }
             }
             catch(const std::exception& e)
             {
-                harpoon.push(std::make_shared<EventMessage>("!!PARSE_ERROR!!", payload + ", " + e.what()));
+                harpoon.push(EventMessage("!!PARSE_ERROR!!", payload + ", " + e.what()));
             }
         });
     wss.set_open_handler(
         [this](auto hdl)
         {
             wssHandle = hdl;
-            harpoon.push(std::make_shared<EventMessage>(
-                "system",
-                "connected to hack.chat...",
-                MessageType::Status));
+            harpoon.push(EventMessage("system",
+                                      "connected to hack.chat...",
+                                      MessageType::Status));
             Json::Value root;
             root["cmd"] = "join";
             root["channel"] = channel;
@@ -210,10 +206,9 @@ void Client::onHackConnect(EventHackConnect& event)
                 ec);
             if (ec)
             {
-                harpoon.push(std::make_shared<EventMessage>(
-                    "system",
-                    "failed to send message to hack.chat: " + ec.message(),
-                    MessageType::Status));
+                harpoon.push(EventMessage("system",
+                                          "failed to send message to hack.chat: " + ec.message(),
+                                          MessageType::Status));
             }
             wssPingThread = NJThread("WssPing",
                                      [this, hdl]
@@ -238,65 +233,56 @@ void Client::onHackConnect(EventHackConnect& event)
     wss.set_fail_handler(
         [this](auto hdl)
         {
-            harpoon.push(
-                std::make_shared<EventMessage>(
-                    "system",
-                    "cxn error on hack.chat...",
-                    MessageType::Status));
+            harpoon.push(EventMessage("system",
+                                      "cxn error on hack.chat...",
+                                      MessageType::Status));
         });
     WssErrorCode ec;
     auto con = wss.get_connection(server, ec);
     if (ec)
     {
         connected = false;
-        harpoon.push(std::make_shared<EventMessage>(
-            "system",
-            "failed to connect to hack.chat: " + ec.message(),
-            MessageType::Status));
+        harpoon.push(EventMessage("system",
+                                  "failed to connect to hack.chat: " + ec.message(),
+                                  MessageType::Status));
         return;
     }
     wss.connect(con);
     wssThread = NJThread("WssThread", [this]{wss.run();});
 }
             
-void Client::onHackConnected(EventHackConnected& event)
+void Client::onHackConnected(const EventHackConnected& event)
 {
-    harpoon.push(
-        std::make_shared<EventMessage>(
-            "system",
-            "connected to hack.chat...",
-            MessageType::Status));
+    harpoon.push(EventMessage("system",
+                              "connected to hack.chat...",
+                              MessageType::Status));
 }
-void Client::onHackDisconnect(EventHackDisconnect& event)
+void Client::onHackDisconnect(const EventHackDisconnect& event)
 {
     connected = false;
-    harpoon.push(
-        std::make_shared<EventMessage>(
-            "system",
-            "disconnecting from hack.chat...",
-            MessageType::Status));
+    harpoon.push(EventMessage("system",
+                              "disconnecting from hack.chat...",
+                              MessageType::Status));
 }
-void Client::onHackDisconnected(EventHackDisconnected& event)
+void Client::onHackDisconnected(const EventHackDisconnected& event)
 {
     if (connected)
     {
-        harpoon.push(
-            std::make_shared<EventMessage>(
-                "system",
-                "reconnecting to hack.chat...",
-                MessageType::Status));
-        queue.push(std::make_shared<EventHackConnect>(server, channel, username, password));
+        harpoon.push(EventMessage("system",
+                                  "reconnecting to hack.chat...",
+                                  MessageType::Status));
+        queue.push(EventHackConnect(server, channel, username, password));
         connected = false;
     }
     else
     {
-        harpoon.push(std::make_shared<EventMessage>(
-            "system",
-            "disconnected from hack.chat...",
-            MessageType::Status));
+        harpoon.push(EventMessage("system",
+                                  "disconnected from hack.chat...",
+                                  MessageType::Status));
     }
     std::lock_guard lock(wssPingMutex);
     wssPingCondition.notify_all();
 }
 
 }
+

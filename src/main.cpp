@@ -59,7 +59,7 @@ int main(int argc, char* argv[])
 
     NCurses ncurses(ncursesQueue, hackChatClient.queue);
 
-    hackChatClient.queue.push(std::make_shared<EventHackConnect>("wss://hack.chat/chat-ws", channel, username, password));
+    hackChatClient.queue.push(EventHackConnect("wss://hack.chat/chat-ws", channel, username, password));
 
     simpleSignalHandler.handle();
     return 0;

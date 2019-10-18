@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0)
-project(harpoon3)
+project(harpoon2)
 set(CMAKE_CXX_STANDARD 17)
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/lib)
@@ -68,13 +68,13 @@ list(APPEND LIBRARIES
   ${JSONCPP_LIBRARIES}
   ${CURSES_LIBRARIES})
 
-add_executable(harpoon3 ${SOURCES})
-target_include_directories(harpoon3 PUBLIC ${INCLUDES})
-target_link_libraries(harpoon3 ${LIBRARIES})
+add_executable(harpoon2 ${SOURCES})
+target_include_directories(harpoon2 PUBLIC ${INCLUDES})
+target_link_libraries(harpoon2 ${LIBRARIES})
 if (DEPENDENCIES)
-  add_dependencies(harpoon3 ${DEPENDENCIES})
+  add_dependencies(harpoon2 ${DEPENDENCIES})
 endif()
 if (USE_DEBUGLOG)
-  target_compile_definitions(harpoon3 PUBLIC -DUSE_DEBUGLOG)
+  target_compile_definitions(harpoon2 PUBLIC -DUSE_DEBUGLOG)
 endif()
 

@@ -1,27 +1,25 @@
 #pragma once
-#include <type_traits>
+#include <variant>
 
-#define EVENT_CLASS(Target, CallbackName)        \
-    class Event ## CallbackName : public ::Event<Target, Event ## CallbackName, &Target::on ## CallbackName>
+template<class Target, class EventType>
+struct EventTraits { };
 
-class EventBase
+template<class Target, class EventType>
+inline void handleEvent(Target& target, const EventType& event)
 {
-public:
-    inline virtual ~EventBase() = default;
-    virtual void handle(void* t) = 0;
-    template<class T>
-    T& as() { return *static_cast<T*>(this); }
-};
+    std::visit(
+        [&target](auto&& event)
+        {
+            (target.*EventTraits<Target, std::decay_t<decltype(event)>>::Callback)
+                    (event);
+        }, event);
+}
 
-template<class Target, class EventTarget, void(Target::*Callback)(EventTarget&)>
-class Event : public EventBase
-{
-public:
-    Event() { }
-    virtual ~Event() { }
-
-    virtual void handle(void* t)
-    {
-        (static_cast<Target*>(t)->*Callback)(*static_cast<EventTarget*>(this));
+#define MAP_EVENT_CB(TARGET, EVENT_NAME, TARGET_CB)                 \
+    template<>                                                      \
+    struct EventTraits<TARGET, Event ## EVENT_NAME>                 \
+    {                                                               \
+        constexpr static decltype(TARGET_CB) Callback = TARGET_CB;  \
     }
-};
+#define MAP_EVENT(TARGET, EVENT_NAME)                           \
+    MAP_EVENT_CB(TARGET, EVENT_NAME, &TARGET::on ## EVENT_NAME)

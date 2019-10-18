@@ -3,14 +3,9 @@
 #include <websocketpp/client.hpp>
 #include <json/json.h>
 #include "JThread.hpp"
-#include "EventQueue.hpp"
+#include "Events.hpp"
+#include "HackChatEvents.hpp"
 #include "globals.hpp"
-
-class EventHackSendMessage;
-class EventHackConnect;
-class EventHackConnected;
-class EventHackDisconnect;
-class EventHackDisconnected;
 
 namespace hackchat
 {
@@ -25,13 +20,13 @@ public:
     Client(EventQueue& harpoon);
     ~Client();
 
-    void onHackSendMessage(EventHackSendMessage& event);
-    void onHackConnect(EventHackConnect& event);
-    void onHackConnected(EventHackConnected& event);
-    void onHackDisconnect(EventHackDisconnect& event);
-    void onHackDisconnected(EventHackDisconnected& event);
+    void onHackSendMessage(const EventHackSendMessage& event);
+    void onHackConnect(const EventHackConnect& event);
+    void onHackConnected(const EventHackConnected& event);
+    void onHackDisconnect(const EventHackDisconnect& event);
+    void onHackDisconnected(const EventHackDisconnected& event);
 
-    EventQueue queue;
+    HackEventQueue queue;
 
 private:
     EventQueue& harpoon;
