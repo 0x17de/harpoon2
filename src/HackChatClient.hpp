@@ -17,7 +17,7 @@ using WssErrorCode = websocketpp::lib::error_code;
 class Client
 {
 public:
-    Client(EventQueue& harpoon);
+    explicit Client(EventQueue& harpoon);
     ~Client();
 
     void onHackSendMessage(const EventHackSendMessage& event);
