@@ -1,7 +1,6 @@
 #pragma once
 #include "Queue.hpp"
 #include <boost/date_time.hpp>
-#include "EventBase.hpp"
 #include "enums/MessageType.hpp"
 #include "enums/UserChangeType.hpp"
 #include "Queue.hpp"
@@ -44,12 +43,3 @@ class EventHackDisconnected
 {
 };
 
-using HackEvent = std::variant<
-    EventHackSendMessage,
-    EventHackConnect,
-    EventHackDisconnect,
-    EventHackConnected,
-    EventHackDisconnected
-    >;
-
-using HackEventQueue = Queue<HackEvent>;

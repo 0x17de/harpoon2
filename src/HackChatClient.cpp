@@ -1,13 +1,7 @@
 #include "HackChatClient.hpp"
 #include <boost/date_time.hpp>
 #include "HackChatEvents.hpp"
-#include "Events.hpp"
-
-MAP_EVENT(hackchat::Client, HackSendMessage);
-MAP_EVENT(hackchat::Client, HackConnect);
-MAP_EVENT(hackchat::Client, HackConnected);
-MAP_EVENT(hackchat::Client, HackDisconnect);
-MAP_EVENT(hackchat::Client, HackDisconnected);
+#include "HarpoonEvents.hpp"
 
 namespace hackchat
 {
@@ -42,7 +36,16 @@ Client::Client(EventQueue& harpoon)
             while (RUNNING)
             {
                 if (const auto& optMessage = this->queue.pop())
-                    handleEvent(*this, *optMessage);
+                    std::visit(
+                        [this](auto&& e)
+                        {
+                            using Type = std::decay_t<decltype(*e)>;
+                            if constexpr(std::is_same_v<Type, EventHackSendMessage>) return this->onHackSendMessage(*e);
+                            if constexpr(std::is_same_v<Type, EventHackConnect>) return this->onHackConnect(*e);
+                            if constexpr(std::is_same_v<Type, EventHackConnected>) return this->onHackConnected(*e);
+                            if constexpr(std::is_same_v<Type, EventHackDisconnect>) return this->onHackDisconnect(*e);
+                            if constexpr(std::is_same_v<Type, EventHackDisconnected>) return this->onHackDisconnected(*e);
+                        }, *optMessage);
             }
         });
 }
@@ -75,7 +78,7 @@ void Client::onHackConnect(const EventHackConnect& event)
     username = event.username;
     password = event.password;
 
-    harpoon.push(EventMessage(
+    harpoon.push(std::make_shared<EventMessage>(
         "system",
         "connecting to hack.chat " + server,
         MessageType::Status));
@@ -113,22 +116,22 @@ void Client::onHackConnect(const EventHackConnect& event)
                     std::string text = root.get("text", "").asString();
                     text.erase(std::remove(text.begin(), text.end(), '\0'), text.end()); // remove nullbytes
 
-                    auto event = EventMessage(root.get("nick", "system").asString(),
-                                              text);
-                    parseTime(event.time, root["time"]);
+                    auto event = std::make_shared<EventMessage>(root.get("nick", "system").asString(),
+                                                                text);
+                    parseTime(event->time, root["time"]);
 
-                    event.extra["trip"] = root.get("trip", "").asString();
-                    event.extra["mod"] = root.get("mod", false).asBool() ? "1" : "";
+                    event->extra["trip"] = root.get("trip", "").asString();
+                    event->extra["mod"] = root.get("mod", false).asBool() ? "1" : "";
 
-                    harpoon.push(std::move(event));
+                    harpoon.push(event);
                 }
                 else if (cmd == "warn")
                 {
-                    auto event = EventMessage("system",
-                                              root.get("text", "").asString(),
-                                              MessageType::Status);
-                    parseTime(event.time, root["time"]);
-                    harpoon.push(std::move(event));
+                    auto event = std::make_shared<EventMessage>("system",
+                                                                root.get("text", "").asString(),
+                                                                MessageType::Status);
+                    parseTime(event->time, root["time"]);
+                    harpoon.push(event);
                 }
                 else if (cmd == "info")
                 {
@@ -138,17 +141,17 @@ void Client::onHackConnect(const EventHackConnect& event)
                         const std::string& nick = root.get("from", "").asString();
                         const std::string& trip = root.get("trip", "").asString();
                         const std::string& utype = root.get("utype", "").asString();
-                        auto event = EventMessage(nick,
-                                                  root.get("text", "").asString(),
-                                                  MessageType::Whisper);
-                        if (!trip.empty()) event.extra["trip"] = trip;
-                        if (utype == "mod") event.extra["mod"] = "1";
-                        harpoon.push(std::move(event));
+                        auto event = std::make_shared<EventMessage>(nick,
+                                                                    root.get("text", "").asString(),
+                                                                    MessageType::Whisper);
+                        if (!trip.empty()) event->extra["trip"] = trip;
+                        if (utype == "mod") event->extra["mod"] = "1";
+                        harpoon.push(event);
                     }
                     else if (type == "emote")
                     {
                         const std::string& nick = root.get("nick", "").asString();
-                        harpoon.push(EventMessage(nick,
+                        harpoon.push(std::make_shared<EventMessage>(nick,
                                                   root.get("text", "").asString(),
                                                   MessageType::Me));
                     }
@@ -156,18 +159,18 @@ void Client::onHackConnect(const EventHackConnect& event)
                 else if (cmd == "onlineAdd")
                 {
                     const std::string& nick = root.get("nick", "").asString();
-                    harpoon.push(EventUserChanged(nick, UserChangeType::Add));
-                    harpoon.push(EventMessage("system",
+                    harpoon.push(std::make_shared<EventUserChanged>(nick, UserChangeType::Add));
+                    harpoon.push(std::make_shared<EventMessage>("system",
                                               nick + " has joined the channel",
                                               MessageType::Status));
                 }
                 else if (cmd == "onlineRemove")
                 {
                     const std::string& nick = root.get("nick", "").asString();
-                    harpoon.push(EventMessage("system",
+                    harpoon.push(std::make_shared<EventMessage>("system",
                                               nick + " has left the channel",
                                               MessageType::Status));
-                    harpoon.push(EventUserChanged(nick, UserChangeType::Remove));
+                    harpoon.push(std::make_shared<EventUserChanged>(nick, UserChangeType::Remove));
                 }
                 else if (cmd == "onlineSet")
                 {
@@ -177,20 +180,20 @@ void Client::onHackConnect(const EventHackConnect& event)
                         std::vector<std::string> nicks(nicksArrayValue.size());
                         for (int i = 0; i < static_cast<int>(nicksArrayValue.size()); ++i)
                             nicks[i] = nicksArrayValue[i].asString();
-                        harpoon.push(EventUserList(std::move(nicks)));
+                        harpoon.push(std::make_shared<EventUserList>(std::move(nicks)));
                     }
                 }
             }
             catch(const std::exception& e)
             {
-                harpoon.push(EventMessage("!!PARSE_ERROR!!", payload + ", " + e.what()));
+                harpoon.push(std::make_shared<EventMessage>("!!PARSE_ERROR!!", payload + ", " + e.what()));
             }
         });
     wss.set_open_handler(
         [this](auto hdl)
         {
             wssHandle = hdl;
-            harpoon.push(EventMessage("system",
+            harpoon.push(std::make_shared<EventMessage>("system",
                                       "connected to hack.chat...",
                                       MessageType::Status));
             Json::Value root;
@@ -206,7 +209,7 @@ void Client::onHackConnect(const EventHackConnect& event)
                 ec);
             if (ec)
             {
-                harpoon.push(EventMessage("system",
+                harpoon.push(std::make_shared<EventMessage>("system",
                                           "failed to send message to hack.chat: " + ec.message(),
                                           MessageType::Status));
             }
@@ -233,7 +236,7 @@ void Client::onHackConnect(const EventHackConnect& event)
     wss.set_fail_handler(
         [this](auto hdl)
         {
-            harpoon.push(EventMessage("system",
+            harpoon.push(std::make_shared<EventMessage>("system",
                                       "cxn error on hack.chat...",
                                       MessageType::Status));
         });
@@ -242,7 +245,7 @@ void Client::onHackConnect(const EventHackConnect& event)
     if (ec)
     {
         connected = false;
-        harpoon.push(EventMessage("system",
+        harpoon.push(std::make_shared<EventMessage>("system",
                                   "failed to connect to hack.chat: " + ec.message(),
                                   MessageType::Status));
         return;
@@ -253,14 +256,14 @@ void Client::onHackConnect(const EventHackConnect& event)
             
 void Client::onHackConnected(const EventHackConnected& event)
 {
-    harpoon.push(EventMessage("system",
+    harpoon.push(std::make_shared<EventMessage>("system",
                               "connected to hack.chat...",
                               MessageType::Status));
 }
 void Client::onHackDisconnect(const EventHackDisconnect& event)
 {
     connected = false;
-    harpoon.push(EventMessage("system",
+    harpoon.push(std::make_shared<EventMessage>("system",
                               "disconnecting from hack.chat...",
                               MessageType::Status));
 }
@@ -268,15 +271,15 @@ void Client::onHackDisconnected(const EventHackDisconnected& event)
 {
     if (connected)
     {
-        harpoon.push(EventMessage("system",
+        harpoon.push(std::make_shared<EventMessage>("system",
                                   "reconnecting to hack.chat...",
                                   MessageType::Status));
-        queue.push(EventHackConnect(server, channel, username, password));
+        queue.push(std::make_shared<EventHackConnect>(server, channel, username, password));
         connected = false;
     }
     else
     {
-        harpoon.push(EventMessage("system",
+        harpoon.push(std::make_shared<EventMessage>("system",
                                   "disconnected from hack.chat...",
                                   MessageType::Status));
     }

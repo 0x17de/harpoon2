@@ -9,7 +9,7 @@
 #include <poll.h>
 #include <ncurses.h>
 #include <utf8.h>
-#include "Events.hpp"
+#include "HarpoonEvents.hpp"
 #include "HackChatEvents.hpp"
 #include "enums/MessageType.hpp"
 #include "enums/UserChangeType.hpp"
@@ -24,11 +24,6 @@
 #define PAIR_MOD 4
 #define PAIR_STATUS 5
 #define PAIR_MENTION 6
-
-MAP_EVENT(NCurses, Input);
-MAP_EVENT(NCurses, UserList);
-MAP_EVENT(NCurses, UserChanged);
-MAP_EVENT(NCurses, Message);
 
 class BacklogMessage
 {
@@ -158,7 +153,7 @@ void BacklogMessage::computeMessageWithBreaks(size_t maxMessageWidth)
     calculatedMessageWidth = maxMessageWidth;
 }
 
-NCurses::NCurses(EventQueue& queue, HackEventQueue& hackChatQueue)
+NCurses::NCurses(EventQueue& queue, HackChatEventQueue& hackChatQueue)
     : queue(queue)
     , hackChatQueue(hackChatQueue)
 {
@@ -171,7 +166,15 @@ NCurses::NCurses(EventQueue& queue, HackEventQueue& hackChatQueue)
             while (RUNNING)
             {
                 if (const auto& optMessage = this->queue.pop())
-                    handleEvent(*this, *optMessage);
+                    std::visit(
+                        [this](auto&& e)
+                        {
+                            using Type = std::decay_t<decltype(*e)>;
+                            if constexpr(std::is_same_v<Type, EventInput>) return this->onInput(*e);
+                            if constexpr(std::is_same_v<Type, EventUserList>) return this->onUserList(*e);
+                            if constexpr(std::is_same_v<Type, EventUserChanged>) return this->onUserChanged(*e);
+                            if constexpr(std::is_same_v<Type, EventMessage>) return this->onMessage(*e);
+                        }, *optMessage);
             }
         });
     t = NJThread(
@@ -453,7 +456,7 @@ NCurses::NCurses(EventQueue& queue, HackEventQueue& hackChatQueue)
                     }
                     else if (k == '\r' || k == '\n')
                     {
-                        this->queue.push(EventInput(buffer));
+                        this->queue.push(std::make_shared<EventInput>(buffer));
                         buffer = "";
                         redrawinput = true;
                     }
@@ -472,7 +475,7 @@ NCurses::~NCurses()
 
 void NCurses::onInput(const EventInput& event)
 {
-    hackChatQueue.push(EventHackSendMessage(event.message));
+    hackChatQueue.push(std::make_shared<EventHackSendMessage>(event.message));
 }
 
 void NCurses::onUserList(const EventUserList& event)

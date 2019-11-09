@@ -3,8 +3,8 @@
 #include <websocketpp/client.hpp>
 #include <json/json.h>
 #include "JThread.hpp"
-#include "Events.hpp"
-#include "HackChatEvents.hpp"
+#include "HarpoonEventQueue.hpp"
+#include "HackChatEventQueue.hpp"
 #include "globals.hpp"
 
 namespace hackchat
@@ -26,7 +26,7 @@ public:
     void onHackDisconnect(const EventHackDisconnect& event);
     void onHackDisconnected(const EventHackDisconnected& event);
 
-    HackEventQueue queue;
+    HackChatEventQueue queue;
 
 private:
     EventQueue& harpoon;

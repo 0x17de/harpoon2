@@ -2,7 +2,6 @@
 #include "Queue.hpp"
 #include <boost/date_time.hpp>
 #include <variant>
-#include "EventBase.hpp"
 #include "enums/MessageType.hpp"
 #include "enums/UserChangeType.hpp"
 #include "Queue.hpp"
@@ -66,12 +65,3 @@ public:
     MessageType type;
     std::map<std::string, std::string> extra;
 };
-
-using Event = std::variant<
-    EventInput,
-    EventUserList,
-    EventUserChanged,
-    EventMessage
-    >;
-
-using EventQueue = Queue<Event>;
